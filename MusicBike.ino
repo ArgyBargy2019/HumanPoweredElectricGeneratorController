@@ -1,7 +1,7 @@
-//This is the name of the file on the microSD card you would like to play
-//Stick with normal 8.3 nomeclature. All lower-case works well.
-//Note: you must name the tracks on the SD card with 001, 002, 003, etc.
-//For example, the code is expecting to play 'track002.mp3', not track2.mp3.
+// This is the name of the file on the microSD card you would like to play
+// Stick with normal 8.3 nomeclature. All lower-case works well.
+// Note: you must name the tracks on the SD card with 001, 002, 003, etc.
+// For example, the code is expecting to play 'track002.mp3', not track2.mp3.
 char trackName[] = "track001.mp3";
 int trackNumber = 1;
 
@@ -11,7 +11,10 @@ byte pedalLevelPrev = 0;
 void setup() {
 
     // Setup input pins here
+    //..
 
+    // Setup the MP3 shield with SD card
+    // Remember you have to edit the Sd2PinMap.h of the sdfatlib library to correct control the SD card.
     setupMP3();
     
     Serial.begin(57600); //Use serial for debugging
@@ -25,6 +28,7 @@ byte getPedalLevel() {
   return 0;
 }
 
+// Run during playback of sound
 bool simulFnCheckInput() {
 
     pedalLevel = getPedalLevel();
@@ -40,14 +44,17 @@ void loop() {
 
     // Wait for pedaling
     while (pedalLevel == 0) {
-      pedalLevel = getPedalLevel(); // Check what speed the bike is moving at
+        // Check what speed the bike is moving at
+        pedalLevel = getPedalLevel();
     }
 
-  int trackNumber = pedalLevel;
+    trackNumber = pedalLevel;
     
     // Play track corresponding to the pedal level
     sprintf(trackName, "track%03d.mp3", trackNumber); // Splice the new file number into this file name
-    playMP3(trackName, &simulFnCheckInput); //Go play trackXXX.mp3
+
+    // Blocking function to play track
+    playMP3(trackName, &simulFnCheckInput);
 }
 
 

@@ -12,7 +12,7 @@
 #define MP3_XDCS 7 //Data Chip Select / BSYNC Pin
 #define MP3_DREQ 2 //Data Request Pin: Player asks for more data
 #define MP3_RESET 8 //Reset is active low
-//Remember you have to edit the Sd2PinMap.h of the sdfatlib library to correct control the SD card.
+// Remember you have to edit the Sd2PinMap.h of the sdfatlib library to correct control the SD card.
 
 //VS10xx SCI Registers
 #define SCI_MODE 0x00
@@ -80,8 +80,6 @@ void setupMP3() {
     //Internal clock multiplier is now 3x.
     //Therefore, max SPI speed is 5MHz. 4MHz will be safe.
     SPI.setClockDivider(SPI_CLOCK_DIV4); //Set SPI bus speed to 4MHz (16MHz / 4 = 4MHz)
-    
-    //MP3 IC setup complete
 }
 
 // PlayMP3 plays a given file name
@@ -112,82 +110,99 @@ void playMP3(char* fileName, bool (*simultaneousFn)(void)) {
             // Do simultaneous function here, since the buffer of the MP3 is full and happy.
             const bool shouldStop = (*simultaneousFn)();
             if (shouldStop) {
-              track.close();
-              break;
+                track.close();
+                break;
             }
             
             //If the MP3 IC is happy, but we need to read new data from the SD, now is a great time to do so
-            if(need_data == true) {
-                if(!track.read(mp3DataBuffer, sizeof(mp3DataBuffer))) { //Try reading 32 new bytes of the song
-                    //Oh no! There is no data left to read!
-                    //Time to exit
+            if (need_data == true) {
+
+                //Try reading 32 new bytes of the song
+                if (!track.read(mp3DataBuffer, sizeof(mp3DataBuffer))) {
+                    // There is no data left to read!
                     break;
                 }
                 need_data = false;
             }
         }
-        
-        if(need_data == true){ //This is here in case we haven't had any free time to load new data
-            if(!track.read(mp3DataBuffer, sizeof(mp3DataBuffer))) { //Go out to SD card and try reading 32 new bytes of the song
-                //Oh no! There is no data left to read!
-                //Time to exit
+
+        //This is here in case we haven't had any free time to load new data
+        if (need_data == true){
+
+            //Go out to SD card and try reading 32 new bytes of the song
+            if (!track.read(mp3DataBuffer, sizeof(mp3DataBuffer))) {
+                // There is no data left to read!
                 break;
             }
             need_data = false;
         }
         
-        //Once DREQ is released (high) we now feed 32 bytes of data to the VS1053 from our SD read buffer
+        // Once DREQ is released (high) we now feed 32 bytes of data to the VS1053 from our SD read buffer
         digitalWrite(MP3_XDCS, LOW); //Select Data
-        for(int y = 0 ; y < sizeof(mp3DataBuffer) ; y++)
-            SPI.transfer(mp3DataBuffer[y]); // Send SPI byte
+        for (int y = 0 ; y < sizeof(mp3DataBuffer) ; y++) {
+            // Send SPI byte
+            SPI.transfer(mp3DataBuffer[y]);
+        }
         
         digitalWrite(MP3_XDCS, HIGH); //Deselect Data
         need_data = true; //We've just dumped 32 bytes into VS1053 so our SD read buffer is empty. Set flag so we go get more data
     }
-    
-    while(!digitalRead(MP3_DREQ)) ; //Wait for DREQ to go high indicating transfer is complete
-    digitalWrite(MP3_XDCS, HIGH); //Deselect Data
-    
-    track.close(); //Close out this track
+
+    // Wait for DREQ to go high indicating transfer is complete
+    while (!digitalRead(MP3_DREQ));
+
+    // Deselect data
+    digitalWrite(MP3_XDCS, HIGH);
+
+    // Close out this track
+    track.close();
     
     sprintf(errorMsg, "Track %s done!", fileName);
     Serial.println(errorMsg);
 }
 
-//Write to VS10xx register
-//SCI: Data transfers are always 16bit. When a new SCI operation comes in
-//DREQ goes low. We then have to wait for DREQ to go high again.
-//XCS should be low for the full duration of operation.
+// Write to VS10xx register
+// SCI: Data transfers are always 16bit. When a new SCI operation comes in
+// DREQ goes low. We then have to wait for DREQ to go high again.
+// XCS should be low for the full duration of operation.
+void Mp3WriteRegister(unsigned char addressbyte, unsigned char highbyte, unsigned char lowbyte) {
 
-void Mp3WriteRegister(unsigned char addressbyte, unsigned char highbyte, unsigned char lowbyte){
-  
-    while(!digitalRead(MP3_DREQ)) ; //Wait for DREQ to go high indicating IC is available
-    digitalWrite(MP3_XCS, LOW); //Select control
+    // Wait for DREQ to go high indicating IC is available
+    while (!digitalRead(MP3_DREQ));
+
+    // Select control
+    digitalWrite(MP3_XCS, LOW);
     
-    //SCI consists of instruction byte, address byte, and 16-bit data word.
-    SPI.transfer(0x02); //Write instruction
+    // SCI consists of instruction byte, address byte, and 16-bit data word.
+    SPI.transfer(0x02); // Write instruction
     SPI.transfer(addressbyte);
     SPI.transfer(highbyte);
     SPI.transfer(lowbyte);
-    while(!digitalRead(MP3_DREQ)) ; //Wait for DREQ to go high indicating command is complete
-    digitalWrite(MP3_XCS, HIGH); //Deselect Control
+
+    // Wait for DREQ to go high indicating command is complete
+    while (!digitalRead(MP3_DREQ));
+
+    // Deselect control
+    digitalWrite(MP3_XCS, HIGH);
 }
 
 // Read the 16-bit value of a VS10xx register
-unsigned int Mp3ReadRegister (unsigned char addressbyte){
-    while(!digitalRead(MP3_DREQ)) ; //Wait for DREQ to go high indicating IC is available
-    digitalWrite(MP3_XCS, LOW); //Select control
+unsigned int Mp3ReadRegister (unsigned char addressbyte) {
+
+    //Wait for DREQ to go high indicating IC is available
+    while (!digitalRead(MP3_DREQ));
+    digitalWrite(MP3_XCS, LOW); // Select control
     
-    //SCI consists of instruction byte, address byte, and 16-bit data word.
-    SPI.transfer(0x03);  //Read instruction
+    // SCI consists of instruction byte, address byte, and 16-bit data word.
+    SPI.transfer(0x03); // Read instruction
     SPI.transfer(addressbyte);
     
-    char response1 = SPI.transfer(0xFF); //Read the first byte
-    while(!digitalRead(MP3_DREQ)) ; //Wait for DREQ to go high indicating command is complete
-    char response2 = SPI.transfer(0xFF); //Read the second byte
-    while(!digitalRead(MP3_DREQ)) ; //Wait for DREQ to go high indicating command is complete
+    char response1 = SPI.transfer(0xFF); // Read the first byte
+    while(!digitalRead(MP3_DREQ)) ; // Wait for DREQ to go high indicating command is complete
+    char response2 = SPI.transfer(0xFF); // Read the second byte
+    while(!digitalRead(MP3_DREQ)) ; // Wait for DREQ to go high indicating command is complete
     
-    digitalWrite(MP3_XCS, HIGH); //Deselect Control
+    digitalWrite(MP3_XCS, HIGH); // Deselect Control
     
     int resultvalue = response1 << 8;
     resultvalue |= response2;
@@ -195,6 +210,6 @@ unsigned int Mp3ReadRegister (unsigned char addressbyte){
 }
 
 // Set VS10xx Volume Register
-void Mp3SetVolume(unsigned char leftchannel, unsigned char rightchannel){
+void Mp3SetVolume(unsigned char leftchannel, unsigned char rightchannel) {
     Mp3WriteRegister(SCI_VOL, leftchannel, rightchannel);
 }
