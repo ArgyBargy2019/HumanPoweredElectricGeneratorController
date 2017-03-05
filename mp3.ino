@@ -2,8 +2,8 @@
 
 #include <SPI.h>
 #include <SD.h>
-#include <SdFat.h>
-#include <SdFatUtil.h> 
+//#include <SdFat.h>
+//#include <SdFatUtil.h> 
 
 // TODO: Test using SD.h only vs all three: SD, SDFat, SDFatUtil
 
